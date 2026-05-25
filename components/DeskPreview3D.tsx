@@ -3,10 +3,8 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { usePlannerStore } from '@/lib/store';
 import { getCatalogItem } from '@/lib/catalog';
-import { ROOM_W, ROOM_H } from '@/lib/types';
 import type { PlacedItem } from '@/lib/types';
 
-// Height of each item category in 3D units (1 unit = 1 grid cell ≈ 2 ft)
 const HEIGHTS: Record<string, number> = {
   desk:     0.10,
   chair:    0.50,
@@ -15,6 +13,8 @@ const HEIGHTS: Record<string, number> = {
   audio:    0.20,
   lighting: 0.28,
 };
+
+// ── Single item mesh ─────────────────────────────────────────────────────────
 
 function ItemMesh({ item }: { item: PlacedItem }) {
   const cat = getCatalogItem(item.catalogId);
@@ -37,16 +37,21 @@ function ItemMesh({ item }: { item: PlacedItem }) {
   );
 }
 
+// ── Full scene ────────────────────────────────────────────────────────────────
+
 function Scene() {
   const items = usePlannerStore((s) => s.items);
-  const cx = ROOM_W / 2;
-  const cz = ROOM_H / 2;
+  const roomW = usePlannerStore((s) => s.roomW);
+  const roomH = usePlannerStore((s) => s.roomH);
+
+  const cx = roomW / 2;
+  const cz = roomH / 2;
   const wallH = 0.4;
   const wallT = 0.12;
+  const gridSize = Math.max(roomW, roomH) + 2;
 
   return (
     <>
-      {/* Lighting */}
       <ambientLight intensity={0.55} />
       <directionalLight
         position={[cx + 8, 14, cz + 6]}
@@ -56,61 +61,58 @@ function Scene() {
       />
       <directionalLight position={[cx - 6, 8, cz - 8]} intensity={0.3} />
 
-      {/* Sky color */}
       <color attach="background" args={['#0f172a']} />
       <fog attach="fog" args={['#0f172a', 30, 70]} />
 
       {/* Floor */}
-      <mesh
-        receiveShadow
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[cx, 0, cz]}
-      >
-        <planeGeometry args={[ROOM_W, ROOM_H]} />
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[cx, 0, cz]}>
+        <planeGeometry args={[roomW, roomH]} />
         <meshStandardMaterial color="#e5e7eb" />
       </mesh>
 
-      {/* Grid overlay on floor */}
+      {/* Grid */}
       <gridHelper
-        args={[Math.max(ROOM_W, ROOM_H) + 2, Math.max(ROOM_W, ROOM_H) + 2, '#94a3b8', '#cbd5e1']}
+        args={[gridSize, gridSize, '#94a3b8', '#cbd5e1']}
         position={[cx, 0.002, cz]}
       />
 
-      {/* Room walls (North / South / West / East) */}
+      {/* Walls */}
       <mesh position={[cx, wallH / 2, 0]}>
-        <boxGeometry args={[ROOM_W, wallH, wallT]} />
+        <boxGeometry args={[roomW, wallH, wallT]} />
         <meshStandardMaterial color="#6b7280" />
       </mesh>
-      <mesh position={[cx, wallH / 2, ROOM_H]}>
-        <boxGeometry args={[ROOM_W, wallH, wallT]} />
+      <mesh position={[cx, wallH / 2, roomH]}>
+        <boxGeometry args={[roomW, wallH, wallT]} />
         <meshStandardMaterial color="#6b7280" />
       </mesh>
       <mesh position={[0, wallH / 2, cz]}>
-        <boxGeometry args={[wallT, wallH, ROOM_H]} />
+        <boxGeometry args={[wallT, wallH, roomH]} />
         <meshStandardMaterial color="#6b7280" />
       </mesh>
-      <mesh position={[ROOM_W, wallH / 2, cz]}>
-        <boxGeometry args={[wallT, wallH, ROOM_H]} />
+      <mesh position={[roomW, wallH / 2, cz]}>
+        <boxGeometry args={[wallT, wallH, roomH]} />
         <meshStandardMaterial color="#6b7280" />
       </mesh>
 
-      {/* Placed items */}
-      {items.map((item) => (
-        <ItemMesh key={item.uid} item={item} />
-      ))}
+      {items.map((item) => <ItemMesh key={item.uid} item={item} />)}
 
       <OrbitControls
         target={[cx, 0, cz]}
         maxPolarAngle={Math.PI / 2.05}
         minDistance={4}
-        maxDistance={45}
+        maxDistance={55}
         enablePan
       />
     </>
   );
 }
 
+// ── Canvas wrapper ────────────────────────────────────────────────────────────
+
 export default function DeskPreview3D() {
+  const roomW = usePlannerStore((s) => s.roomW);
+  const roomH = usePlannerStore((s) => s.roomH);
+
   return (
     <div className="w-full h-full flex flex-col">
       <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider shrink-0">
@@ -121,7 +123,7 @@ export default function DeskPreview3D() {
           shadows
           dpr={[1, 2]}
           camera={{
-            position: [ROOM_W / 2, ROOM_H * 0.9, ROOM_H + ROOM_H * 0.6],
+            position: [roomW / 2, Math.max(roomW, roomH) * 0.75, roomH + roomH * 0.65],
             fov: 48,
           }}
           style={{ width: '100%', height: '100%' }}

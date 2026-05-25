@@ -1,10 +1,22 @@
 'use client';
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import { usePlannerStore } from '@/lib/store';
 import { getCatalogItem } from '@/lib/catalog';
-import { CELL_SIZE, ROOM_W, ROOM_H } from '@/lib/types';
+import { canPlace, getDisplayDims } from '@/lib/collision';
+import { dragState } from '@/lib/dragState';
+import { CELL_SIZE } from '@/lib/types';
 
-// ── Single placed item ──────────────────────────────────────────────────────
+// ── Ghost overlay shown while dragging ──────────────────────────────────────
+
+interface Ghost {
+  x: number;
+  y: number;
+  dw: number;
+  dh: number;
+  valid: boolean;
+}
+
+// ── Single placed item ───────────────────────────────────────────────────────
 
 interface PlacedProps {
   uid: string;
@@ -34,17 +46,17 @@ function PlacedItem({ uid, catalogId, x, y, rotation, selected }: PlacedProps) {
       JSON.stringify({ uid, offsetX, offsetY })
     );
     e.dataTransfer.effectAllowed = 'move';
+    dragState.set({ type: 'placed', catalogId, uid, dw, dh, offsetX, offsetY });
   };
 
   return (
     <div
       draggable
       onDragStart={handleDragStart}
+      onDragEnd={() => dragState.clear()}
       onClick={(e) => { e.stopPropagation(); selectItem(uid); }}
       className={`absolute rounded flex flex-col items-center justify-center cursor-grab active:cursor-grabbing select-none transition-[box-shadow] ${
-        selected
-          ? 'ring-2 ring-white shadow-lg z-10'
-          : 'hover:ring-1 hover:ring-gray-300'
+        selected ? 'ring-2 ring-white shadow-lg z-10' : 'hover:ring-1 hover:ring-gray-300'
       }`}
       style={{
         left:   x  * CELL_SIZE + 2,
@@ -63,57 +75,104 @@ function PlacedItem({ uid, catalogId, x, y, rotation, selected }: PlacedProps) {
   );
 }
 
-// ── Room canvas ─────────────────────────────────────────────────────────────
+// ── Room canvas ──────────────────────────────────────────────────────────────
 
 export default function RoomCanvas() {
   const canvasRef = useRef<HTMLDivElement>(null);
-  const { items, addItem, moveItem, selectItem, selectedUid, rotateItem, removeItem } =
-    usePlannerStore();
+  const {
+    items, addItem, moveItem, selectItem, selectedUid,
+    rotateItem, removeItem, undo, redo, roomW, roomH,
+  } = usePlannerStore();
 
-  // Keyboard shortcuts for selected item
+  const [ghost, setGhost] = useState<Ghost | null>(null);
+
+  // ── Keyboard shortcuts ─────────────────────────────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const ctrl = e.ctrlKey || e.metaKey;
+
+      if (ctrl && !e.shiftKey && e.key === 'z') { e.preventDefault(); undo(); return; }
+      if (ctrl && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); redo(); return; }
+
       if (!selectedUid) return;
       if (e.key === 'r' || e.key === 'R') rotateItem(selectedUid);
       if (e.key === 'Delete' || e.key === 'Backspace') removeItem(selectedUid);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selectedUid, rotateItem, removeItem]);
+  }, [selectedUid, rotateItem, removeItem, undo, redo]);
 
+  // ── Grid position from mouse event ────────────────────────────────
   const gridPos = useCallback(
     (e: React.DragEvent, offsetX = 0, offsetY = 0) => {
       const rect = canvasRef.current!.getBoundingClientRect();
-      const x = Math.max(0, Math.min(ROOM_W - 1, Math.floor((e.clientX - rect.left)  / CELL_SIZE) - offsetX));
-      const y = Math.max(0, Math.min(ROOM_H - 1, Math.floor((e.clientY - rect.top) / CELL_SIZE) - offsetY));
-      return { x, y };
+      return {
+        x: Math.max(0, Math.min(roomW - 1, Math.floor((e.clientX - rect.left)  / CELL_SIZE) - offsetX)),
+        y: Math.max(0, Math.min(roomH - 1, Math.floor((e.clientY - rect.top) / CELL_SIZE) - offsetY)),
+      };
     },
-    []
+    [roomW, roomH]
   );
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = e.dataTransfer.types.includes('application/placed-item')
-      ? 'move'
-      : 'copy';
+  // ── Drag over: update ghost ───────────────────────────────────────
+  const handleDragOver = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const src = dragState.active;
+      if (!src) return;
+
+      const offsetX = src.type === 'placed' ? src.offsetX : 0;
+      const offsetY = src.type === 'placed' ? src.offsetY : 0;
+      const rect = canvasRef.current!.getBoundingClientRect();
+      const rawX = Math.floor((e.clientX - rect.left) / CELL_SIZE) - offsetX;
+      const rawY = Math.floor((e.clientY - rect.top)  / CELL_SIZE) - offsetY;
+      const x = Math.max(0, Math.min(roomW - src.dw, rawX));
+      const y = Math.max(0, Math.min(roomH - src.dh, rawY));
+
+      const excludeUid = src.type === 'placed' ? src.uid : null;
+      const valid = canPlace(items, x, y, src.dw, src.dh, excludeUid, roomW, roomH);
+
+      setGhost({ x, y, dw: src.dw, dh: src.dh, valid });
+      e.dataTransfer.dropEffect = src.type === 'placed' ? 'move' : 'copy';
+    },
+    [items, roomW, roomH]
+  );
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!canvasRef.current?.contains(e.relatedTarget as Node)) setGhost(null);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (e.dataTransfer.types.includes('application/placed-item')) {
-      const { uid, offsetX, offsetY } = JSON.parse(
-        e.dataTransfer.getData('application/placed-item')
-      );
-      const { x, y } = gridPos(e, offsetX, offsetY);
-      moveItem(uid, x, y);
-    } else {
-      const catalogId = e.dataTransfer.getData('application/catalog-item');
-      if (catalogId) {
+  // ── Drop: place or move item if valid ────────────────────────────
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setGhost(null);
+      dragState.clear();
+
+      if (e.dataTransfer.types.includes('application/placed-item')) {
+        const { uid, offsetX, offsetY } = JSON.parse(
+          e.dataTransfer.getData('application/placed-item')
+        );
+        const { x, y } = gridPos(e, offsetX, offsetY);
+        const placed = items.find((i) => i.uid === uid);
+        if (!placed) return;
+        const { dw, dh } = getDisplayDims(placed);
+        if (canPlace(items, x, y, dw, dh, uid, roomW, roomH)) {
+          moveItem(uid, x, y);
+        }
+      } else {
+        const catalogId = e.dataTransfer.getData('application/catalog-item');
+        if (!catalogId) return;
+        const cat = getCatalogItem(catalogId);
+        if (!cat) return;
         const { x, y } = gridPos(e);
-        addItem({ catalogId, x, y, rotation: 0 });
+        if (canPlace(items, x, y, cat.w, cat.h, null, roomW, roomH)) {
+          addItem({ catalogId, x, y, rotation: 0 });
+        }
       }
-    }
-  };
+    },
+    [items, addItem, moveItem, gridPos, roomW, roomH]
+  );
 
   return (
     <div className="flex flex-col gap-2">
@@ -121,7 +180,7 @@ export default function RoomCanvas() {
       <div className="flex items-center gap-4 text-xs text-gray-400">
         <span>
           Room&nbsp;
-          <span className="text-gray-200">{ROOM_W}&times;{ROOM_H}</span>
+          <span className="text-gray-200">{roomW}&times;{roomH}</span>
           &nbsp;grid&nbsp;
           <span className="text-gray-500">(1 cell ≈ 2 ft)</span>
         </span>
@@ -130,6 +189,8 @@ export default function RoomCanvas() {
           <kbd className="bg-gray-800 px-1 rounded text-gray-300">R</kbd> rotate
           &nbsp;&nbsp;
           <kbd className="bg-gray-800 px-1 rounded text-gray-300">Del</kbd> delete
+          &nbsp;&nbsp;
+          <kbd className="bg-gray-800 px-1 rounded text-gray-300">Ctrl+Z</kbd> undo
         </span>
       </div>
 
@@ -138,8 +199,8 @@ export default function RoomCanvas() {
         ref={canvasRef}
         className="relative bg-white rounded border-2 border-gray-300 select-none overflow-hidden"
         style={{
-          width:  ROOM_W * CELL_SIZE,
-          height: ROOM_H * CELL_SIZE,
+          width:  roomW * CELL_SIZE,
+          height: roomH * CELL_SIZE,
           backgroundImage: [
             'linear-gradient(to right, #e5e7eb 1px, transparent 1px)',
             'linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)',
@@ -147,22 +208,37 @@ export default function RoomCanvas() {
           backgroundSize: `${CELL_SIZE}px ${CELL_SIZE}px`,
         }}
         onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={() => selectItem(null)}
       >
-        {/* Wall markers */}
+        {/* Wall border */}
         <div className="absolute inset-0 border-4 border-gray-400 rounded pointer-events-none" />
 
         {/* Placed items */}
         {items.map((item) => (
-          <PlacedItem
-            key={item.uid}
-            {...item}
-            selected={item.uid === selectedUid}
-          />
+          <PlacedItem key={item.uid} {...item} selected={item.uid === selectedUid} />
         ))}
 
-        {/* Empty state hint */}
+        {/* Drop ghost */}
+        {ghost && (
+          <div
+            className={`absolute pointer-events-none rounded border-2 transition-colors ${
+              ghost.valid
+                ? 'border-blue-400 bg-blue-400/20'
+                : 'border-red-400 bg-red-400/20'
+            }`}
+            style={{
+              left:   ghost.x  * CELL_SIZE,
+              top:    ghost.y  * CELL_SIZE,
+              width:  ghost.dw * CELL_SIZE,
+              height: ghost.dh * CELL_SIZE,
+              zIndex: 20,
+            }}
+          />
+        )}
+
+        {/* Empty state */}
         {items.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="text-gray-400 text-center">

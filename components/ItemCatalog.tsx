@@ -1,18 +1,21 @@
 'use client';
 import { useState } from 'react';
 import { CATALOG, CATEGORIES } from '@/lib/catalog';
+import { dragState } from '@/lib/dragState';
 import type { CatalogItem } from '@/lib/types';
 
 function CatalogCard({ item }: { item: CatalogItem }) {
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     e.dataTransfer.setData('application/catalog-item', item.id);
     e.dataTransfer.effectAllowed = 'copy';
+    dragState.set({ type: 'catalog', catalogId: item.id, dw: item.w, dh: item.h });
   };
 
   return (
     <div
       draggable
       onDragStart={handleDragStart}
+      onDragEnd={() => dragState.clear()}
       className="flex items-center gap-2 px-2 py-1.5 mx-2 mb-1 rounded cursor-grab active:cursor-grabbing bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-gray-500 transition-colors select-none"
       title={item.description}
     >
@@ -33,9 +36,7 @@ export default function ItemCatalog() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>(
     Object.fromEntries(CATEGORIES.map((c) => [c.key, true]))
   );
-
-  const toggle = (key: string) =>
-    setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
+  const toggle = (key: string) => setExpanded((p) => ({ ...p, [key]: !p[key] }));
 
   return (
     <div className="py-2 select-none">
@@ -56,12 +57,9 @@ export default function ItemCatalog() {
               <span className="flex-1 text-left">{cat.label}</span>
               <span className="text-gray-600 text-xs">{open ? '▾' : '▸'}</span>
             </button>
-
             {open && (
               <div className="pb-1">
-                {items.map((item) => (
-                  <CatalogCard key={item.id} item={item} />
-                ))}
+                {items.map((item) => <CatalogCard key={item.id} item={item} />)}
               </div>
             )}
           </div>
