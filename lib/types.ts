@@ -28,5 +28,11 @@ export interface PlacedItem {
 }
 
 export const CELL_SIZE = 48;  // px per grid cell
+export const SNAP = 0.5;      // snap granularity in cells (half-cell)
 export const ROOM_W = 20;     // room width in cells  (~40 ft)
 export const ROOM_H = 16;     // room height in cells (~32 ft)
+
+/** Categories that can be placed on top of desk surfaces (no floor collision with desks) */
+export const STACKABLE_CATEGORIES: ReadonlySet<Category> = new Set([
+  'monitor', 'input', 'audio', 'lighting',
+]);
