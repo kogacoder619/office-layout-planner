@@ -39,7 +39,7 @@ export const CATALOG: CatalogItem[] = [
     name: 'Office Chair',
     category: 'chair',
     w: 2, h: 2,                    // 24" × 24" ergonomic mesh
-    color: '#111827', color3d: '#4B5563',
+    color: '#334155', color3d: '#94A3B8',
     icon: '🪑',
     description: 'Ergonomic mesh office chair — 24" × 24" footprint',
   },

@@ -5,6 +5,7 @@ import { getCatalogItem } from '@/lib/catalog';
 import { canPlace, getDisplayDims, isItemOnDesk } from '@/lib/collision';
 import { dragState } from '@/lib/dragState';
 import { CELL_SIZE, SNAP, STACKABLE_CATEGORIES } from '@/lib/types';
+import ItemShape from './ItemShape';
 
 // ── Ghost overlay ──────────────────────────────────────────────────────────
 
@@ -44,39 +45,53 @@ function PlacedItem({ uid, catalogId, x, y, rotation, selected, onDesk }: Placed
     dragState.set({ type: 'placed', catalogId, uid, dw, dh, offsetX, offsetY });
   };
 
+  // Only show the name label when the item is big enough to hold text
+  const showLabel = dw * CELL_SIZE >= 72 && dh * CELL_SIZE >= 40;
+
   return (
     <div
       draggable
       onDragStart={handleDragStart}
       onDragEnd={() => dragState.clear()}
       onClick={(e) => { e.stopPropagation(); selectItem(uid); }}
-      className={`absolute rounded flex flex-col items-center justify-center cursor-grab active:cursor-grabbing select-none transition-[box-shadow] ${
-        selected ? 'ring-2 ring-white shadow-lg z-20' : 'hover:ring-1 hover:ring-gray-300'
+      className={`absolute overflow-hidden cursor-grab active:cursor-grabbing select-none transition-[box-shadow] ${
+        selected ? 'ring-2 ring-white shadow-lg z-20' : 'hover:ring-1 hover:ring-white/40'
       } ${onDesk ? 'z-10' : ''}`}
       style={{
         left:   x  * CELL_SIZE + 2,
         top:    y  * CELL_SIZE + 2,
         width:  dw * CELL_SIZE - 4,
         height: dh * CELL_SIZE - 4,
-        backgroundColor: onDesk
-          ? cat.color + 'cc'        // slightly transparent when on desk
-          : cat.color + 'dd',
-        border: onDesk
-          ? `2px solid ${cat.color3d}`   // full border = stacked
-          : `2px solid ${cat.color3d}33`, // faint border = floor
-        borderLeft: onDesk ? undefined : `3px solid ${cat.color3d}`,
+        borderRadius: 4,
+        outline: onDesk
+          ? `2px solid ${cat.color3d}`
+          : `1px solid ${cat.color3d}55`,
       }}
     >
+      {/* Shape SVG fills the entire bounding box */}
+      <ItemShape
+        catalogId={catalogId}
+        dw={dw} dh={dh}
+        color={cat.color}
+        color3d={cat.color3d}
+        rotation={rotation}
+      />
+
+      {/* Stacked-on-desk indicator */}
       {isStackable && onDesk && (
-        <span className="absolute top-0.5 right-0.5 text-xs leading-none opacity-60 pointer-events-none select-none">
+        <span className="absolute top-0.5 right-0.5 text-xs leading-none opacity-70 pointer-events-none select-none drop-shadow">
           ↑
         </span>
       )}
-      <span className={`leading-none pointer-events-none ${dh < 1 ? 'text-sm' : 'text-lg'}`}>{cat.icon}</span>
-      {dw >= 1.5 && dh >= 1 && (
-        <span className="text-white text-xs font-medium leading-tight mt-0.5 px-1 text-center truncate w-full pointer-events-none">
-          {cat.name}
-        </span>
+
+      {/* Name label — only for items large enough to read */}
+      {showLabel && (
+        <div className="absolute bottom-0 inset-x-0 flex justify-center pb-1 pointer-events-none">
+          <span className="text-white text-xs font-semibold px-1.5 leading-tight
+                           bg-black/40 rounded-sm truncate max-w-full backdrop-blur-sm">
+            {cat.name}
+          </span>
+        </div>
       )}
     </div>
   );
