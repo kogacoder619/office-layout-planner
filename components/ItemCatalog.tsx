@@ -25,7 +25,7 @@ function CatalogCard({ item }: { item: CatalogItem }) {
       />
       <div className="flex-1 min-w-0">
         <div className="text-xs font-medium text-white truncate">{item.name}</div>
-        <div className="text-xs text-gray-500">{item.w}&times;{item.h} cells</div>
+        <div className="text-xs text-gray-500">{Math.round(item.w * 12)}&Prime;&thinsp;&times;&thinsp;{Math.round(item.h * 12)}&Prime;</div>
       </div>
       <span className="text-base opacity-60 shrink-0">{item.icon}</span>
     </div>

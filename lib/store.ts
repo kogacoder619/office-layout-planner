@@ -117,7 +117,7 @@ export const usePlannerStore = create<PlannerStore>()(
         }),
     }),
     {
-      name: 'office-planner-v1',
+      name: 'office-planner-v2',
       // Only persist the layout data, not ephemeral UI or history stacks
       partialize: (s) => ({
         items: s.items,

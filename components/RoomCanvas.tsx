@@ -72,10 +72,12 @@ function PlacedItem({ uid, catalogId, x, y, rotation, selected, onDesk }: Placed
           ↑
         </span>
       )}
-      <span className="text-lg leading-none pointer-events-none">{cat.icon}</span>
-      <span className="text-white text-xs font-medium leading-tight mt-0.5 px-1 text-center truncate w-full pointer-events-none">
-        {cat.name}
-      </span>
+      <span className={`leading-none pointer-events-none ${dh < 1 ? 'text-sm' : 'text-lg'}`}>{cat.icon}</span>
+      {dw >= 1.5 && dh >= 1 && (
+        <span className="text-white text-xs font-medium leading-tight mt-0.5 px-1 text-center truncate w-full pointer-events-none">
+          {cat.name}
+        </span>
+      )}
     </div>
   );
 }
@@ -178,9 +180,9 @@ export default function RoomCanvas() {
       <div className="flex items-center gap-4 text-xs text-gray-400">
         <span>
           Room&nbsp;
-          <span className="text-gray-200">{roomW}&times;{roomH}</span>
-          &nbsp;grid&nbsp;
-          <span className="text-gray-500">(1 cell ≈ 2 ft · snaps at ½ cell)</span>
+          <span className="text-gray-200">{roomW}&thinsp;&times;&thinsp;{roomH} ft</span>
+          &nbsp;&mdash;&nbsp;
+          <span className="text-gray-500">1 cell = 1 ft &middot; snaps at 6&Prime;</span>
         </span>
         <span className="text-gray-600">&bull;</span>
         <span>

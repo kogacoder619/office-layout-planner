@@ -80,7 +80,7 @@ export default function OfficePlanner() {
             onChange={(e) => setRoomSize(roomW, Math.max(8, Math.min(40, +e.target.value || roomH)))}
             className="w-11 text-center bg-gray-800 text-white rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
-          <span className="text-gray-600">cells</span>
+          <span className="text-gray-600">ft</span>
         </div>
 
         {/* Spacer */}
@@ -124,7 +124,7 @@ export default function OfficePlanner() {
 
       {/* ── Status bar ───────────────────────────────────────────────── */}
       <footer className="flex items-center gap-3 px-4 py-1 bg-gray-900 border-t border-gray-800 shrink-0 text-xs text-gray-600">
-        <span>{roomW * 2} ft &times; {roomH * 2} ft</span>
+        <span>{roomW} ft &times; {roomH} ft</span>
         <span>&bull;</span>
         <span>Layout auto-saved to browser</span>
         <span>&bull;</span>

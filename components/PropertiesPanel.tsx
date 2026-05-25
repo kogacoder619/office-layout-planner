@@ -109,10 +109,10 @@ export default function PropertiesPanel() {
 
       {/* Stats */}
       <div className="bg-gray-800 rounded p-2 space-y-1.5">
-        <Row label="Position"    value={`(${placed.x}, ${placed.y})`} />
-        <Row label="Grid size"   value={`${dw} × ${dh} cells`} />
-        <Row label="Approx size" value={`${dw * 2}′ × ${dh * 2}′`} />
-        <Row label="Rotation"    value={`${placed.rotation}°`} />
+        <Row label="Position" value={`(${placed.x} ft, ${placed.y} ft)`} />
+        <Row label="Size"     value={`${dw} ft × ${dh} ft`} />
+        <Row label="Dims"     value={`${Math.round(dw * 12)}" × ${Math.round(dh * 12)}"`} />
+        <Row label="Rotation" value={`${placed.rotation}°`} />
       </div>
 
       {/* Description */}
